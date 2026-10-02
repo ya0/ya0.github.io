@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Julia for joint models – Yannik Ammann</title>
+<meta name="description" content="Joint models let a tumour&#x27;s growth curve inform a patient&#x27;s risk of death. For statisticians: the hazard from its definition, the joint likelihood with a non-linear mixed-effects model, and how a Bayesian fit in Julia was checked against R and Stan.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Julia for joint models – Yannik Ammann">
+<meta property="og:description" content="Joint models let a tumour&#x27;s growth curve inform a patient&#x27;s risk of death. For statisticians: the hazard from its definition, the joint likelihood with a non-linear mixed-effects model, and how a Bayesian fit in Julia was checked against R and Stan.">
+<meta property="og:image" content="https://yammann.ch/img/2023-12-winter-walk/02-mountain-view-1280.webp">
+<link rel="canonical" href="https://yammann.ch/posts/joint-models-thesis.html">
+<meta property="og:url" content="https://yammann.ch/posts/joint-models-thesis.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<style>
+:root {
+color-scheme: light dark;
+--font-text: "Helvetica Neue", Helvetica, Arial, sans-serif;
+--font-display: var(--font-text);
+--step--1: clamp(0.84rem, 0.82rem + 0.1vw, 0.9rem);
+--step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+--step-1: clamp(1.2rem, 1.1rem + 0.5vw, 1.45rem);
+--step-2: clamp(1.7rem, 1.4rem + 1.4vw, 2.6rem);
+--step-3: clamp(2.9rem, 1.6rem + 6vw, 6.5rem);
+--space-1: 0.5rem;
+--space-2: 1rem;
+--space-3: 2rem;
+--space-4: clamp(3rem, 2rem + 4vw, 6rem);
+--gutter: clamp(1rem, 4vw, 2.5rem);
+--bg: light-dark(#f2f3f1, #171a19);
+--text: light-dark(#1c211f, #e3e6e2);
+--muted: light-dark(#58605c, #9aa29d);
+--accent: light-dark(#4a6630, #b3c78a);
+--line: light-dark(rgb(88 96 92 / 0.28), rgb(154 162 157 / 0.28));
+--measure: 68ch;
+}
+@media (prefers-reduced-motion: no-preference) {
+@view-transition { navigation: auto; }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+margin: 0;
+min-height: 100svh;
+display: flex;
+flex-direction: column;
+background: var(--bg);
+color: var(--text);
+font: var(--step-0) / 1.6 var(--font-text);
+-webkit-font-smoothing: antialiased;
+overflow-wrap: break-word;
+}
+main { flex: 1; }
+h1, h2, h3 {
+font-family: var(--font-display);
+line-height: 1.15;
+letter-spacing: -0.015em;
+text-wrap: balance;
+}
+h1 { font-size: var(--step-2); }
+p, li { text-wrap: pretty; }
+img {
+max-width: 100%;
+height: auto;
+color: transparent;
+background: center / cover no-repeat;
+}
+a {
+color: var(--accent);
+text-decoration-thickness: 1px;
+text-underline-offset: 0.2em;
+&:hover { text-decoration-thickness: 2px; }
+}
+:focus-visible {
+outline: 2px solid var(--accent);
+outline-offset: 3px;
+border-radius: 2px;
+}
+.skip {
+position: absolute;
+left: var(--gutter);
+top: -3rem;
+z-index: 10;
+padding: var(--space-1) var(--space-2);
+background: var(--bg);
+&:focus { top: var(--space-1); }
+}
+.visually-hidden {
+position: absolute;
+width: 1px;
+height: 1px;
+overflow: hidden;
+clip-path: inset(50%);
+white-space: nowrap;
+}
+.wrap, .hero-text {
+width: min(100% - 2 * var(--gutter), var(--measure));
+margin-inline: auto;
+}
+.wide, .about, .hero-text { width: min(100% - 2 * var(--gutter), 72rem); }
+.muted, .meta { color: var(--muted); }
+.meta { font-size: var(--step--1); }
+.meta a, .site-footer a { padding-block: 0.35rem; }
+.inline {
+display: flex;
+flex-wrap: wrap;
+gap: var(--space-1) var(--space-2);
+margin: 0;
+padding: 0;
+list-style: none;
+}
+.site-header {
+display: flex;
+flex-wrap: wrap;
+align-items: baseline;
+justify-content: space-between;
+gap: var(--space-1) var(--space-3);
+padding: var(--space-2) var(--gutter);
+view-transition-name: site-header;
+}
+.site-name {
+font-weight: 700;
+letter-spacing: -0.01em;
+white-space: nowrap;
+margin-left: max(0px, 1.6rem - var(--gutter));
+a { color: inherit; text-decoration: none; }
+.up { padding: 0.6rem 0 0.6rem 0.6rem; margin-left: calc(-0.6rem - 0.86em); }
+.ya { width: 1.228em; height: 0.717em; margin-right: 0.02em; }
+.back { width: 0.51em; height: 0.85em; margin-right: 0.35em; vertical-align: -0.067em; }
+}
+.site-nav {
+display: flex;
+gap: var(--space-2);
+a { color: var(--muted); text-decoration: none; }
+a:hover, a[aria-current] { color: var(--text); }
+a[aria-current] { text-decoration: underline 2px var(--accent); text-underline-offset: 0.45em; }
+}
+.site-footer {
+display: flex;
+flex-wrap: wrap;
+justify-content: space-between;
+gap: var(--space-1) var(--space-3);
+margin-top: var(--space-4);
+padding: var(--space-3) var(--gutter);
+border-top: 1px solid var(--line);
+font-size: var(--step--1);
+color: var(--muted);
+p { margin: 0; }
+a { color: inherit; }
+}
+.button {
+display: inline-flex;
+align-items: center;
+gap: 0.5em;
+padding: 0.45em 1.1em;
+border: 1.5px solid var(--accent);
+border-radius: 99px;
+color: var(--accent);
+font-weight: 700;
+text-decoration: none;
+svg { flex: none; width: 1em; height: 1em; }
+&:hover { background: var(--accent); color: var(--bg); }
+&.primary { background: var(--accent); color: var(--bg); }
+&.primary:hover { border-color: var(--text); background: var(--text); }
+@media (prefers-reduced-motion: no-preference) {
+transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+}
+.home .site-header {
+position: absolute;
+inset: 0 0 auto;
+z-index: 2;
+color: #fff;
+nav a { color: rgb(255 255 255 / 0.9); }
+nav a:hover { color: #fff; }
+:focus-visible { outline-color: #fff; }
+}
+.hero {
+position: relative;
+isolation: isolate;
+display: grid;
+align-items: end;
+min-height: min(92svh, 58rem);
+color: #fff;
+overflow: hidden;
+--scrim: rgb(0 0 0 / 0.3) 42%, transparent 68%;
+--scrim-top: 10rem;
+img {
+position: absolute;
+inset: 0;
+z-index: -2;
+width: 100%;
+height: 100%;
+object-fit: cover;
+}
+&::after {
+content: "";
+position: absolute;
+inset: 0;
+z-index: -1;
+background:
+linear-gradient(to top, rgb(0 0 0 / 0.72), var(--scrim)),
+linear-gradient(to bottom, rgb(0 0 0 / 0.66), transparent max(24%, var(--scrim-top)));
+}
+@media (max-height: 30rem) {
+--scrim: rgb(0 0 0 / 0.5) 60%, rgb(0 0 0 / 0.4);
+}
+@media (max-aspect-ratio: 2/3) and (max-width: 43rem) {
+--scrim: rgb(0 0 0 / 0.5) 45%, rgb(0 0 0 / 0.25) 62%, transparent 80%;
+--scrim-top: 12rem;
+}
+}
+.hero-text {
+padding: var(--space-4) 0 clamp(2.5rem, 8vh, 5rem) max(0px, 1.6rem - var(--gutter));
+text-shadow: 0 0 1.5rem rgb(0 0 0 / 0.3);
+h1 {
+margin: 0 0 var(--space-2);
+font-size: var(--step-3);
+font-weight: 700;
+line-height: 0.95;
+letter-spacing: -0.035em;
+}
+p {
+margin: 0;
+max-width: 36ch;
+font-size: var(--step-1);
+line-height: 1.4;
+color: rgb(255 255 255 / 0.92);
+}
+}
+.about {
+padding-block: var(--space-4) var(--space-3);
+font-size: var(--step-1);
+line-height: 1.55;
+> * { max-width: var(--measure); }
+p { margin: 0 0 1em; }
+}
+.links {
+align-items: center;
+margin-top: var(--space-3);
+font-size: var(--step-0);
+}
+.sections {
+display: grid;
+grid-template: auto 1fr / minmax(0, 3fr) minmax(0, 2fr);
+grid-auto-flow: dense;
+gap: var(--space-3) var(--space-4);
+padding-top: var(--space-3);
+a {
+display: block;
+color: var(--text);
+text-decoration: none;
+&:hover h2 { color: var(--accent); }
+}
+> :not(.to-photos) { padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.to-posts {
+a:hover { color: var(--accent); }
+ul { margin: 0; padding: 0; list-style: none; }
+li { margin-bottom: var(--space-2); }
+> .muted a { color: inherit; text-decoration: underline; }
+}
+.to-photos { grid-column: 1; grid-row: span 2; }
+img {
+display: block;
+width: 100%;
+aspect-ratio: 3 / 2;
+object-fit: cover;
+margin-bottom: var(--space-2);
+}
+h2 { margin: 0 0 0.35rem; font-size: var(--step-2); font-weight: 600; }
+p { margin: 0; }
+.muted { margin-top: 0.2rem; font-size: var(--step--1); }
+@media (width < 50rem) {
+grid-template-columns: minmax(0, 1fr);
+.to-photos { grid-row: auto; order: 1; }
+.to-posts { order: 2; }
+}
+}
+.prose {
+padding-top: var(--space-3);
+line-height: 1.65;
+h1 { margin: 0 0 var(--space-1); }
+h2 { font-size: var(--step-1); margin: var(--space-3) 0 var(--space-1); }
+h3 { font-size: var(--step-0); margin: var(--space-3) 0 var(--space-1); }
+ul, ol { padding-left: 1.25rem; }
+li + li { margin-top: 0.3em; }
+}
+.download {
+float: right;
+margin: 0.3rem 0 0 var(--space-2);
+font-size: var(--step--1);
+}
+.cv {
+h1 + p { color: var(--muted); margin-top: 0; }
+h2 {
+margin-top: var(--space-3);
+padding-bottom: 0.35rem;
+border-bottom: 1px solid var(--line);
+font-size: var(--step-1);
+font-weight: 600;
+}
+h2 + h3 { margin-top: var(--space-2); }
+h3 { margin-bottom: 0; }
+h3 + p { margin: 0.1rem 0 0.5rem; font-size: var(--step--1); color: var(--muted); }
+}
+.page-title { margin: var(--space-3) 0 var(--space-2); }
+.posts {
+margin: 0;
+padding: 0;
+list-style: none;
+li { padding-block: var(--space-3); border-top: 1px solid var(--line); }
+h2 { margin: 0 0 0.25rem; font-size: var(--step-1); }
+h2 a { color: var(--text); text-decoration: none; }
+h2 a:hover { color: var(--accent); }
+p { margin: 0.4rem 0 0; }
+}
+.post {
+header { padding-top: var(--space-4); }
+h1 { margin: 0 0 var(--space-2); }
+.meta { margin: 0.2rem 0 0; }
+.abstract {
+margin: var(--space-3) 0 0;
+font-size: var(--step-1);
+line-height: 1.5;
+color: var(--muted);
+}
+.prose { padding-top: var(--space-2); }
+}
+.prose table {
+display: block;
+overflow-x: auto;
+border-collapse: collapse;
+font-variant-numeric: tabular-nums;
+th, td { padding: 0.35rem 1rem 0.35rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { text-align: left; font-weight: 600; }
+}
+@media screen and (prefers-color-scheme: dark) {
+.prose figure img[src$=".svg"]:not([src$="-fixed.svg"]) { filter: invert(1) hue-rotate(180deg); mix-blend-mode: screen; }
+}
+@media (width < 50rem) {
+.prose figure { margin-inline: 0; }
+}
+pre {
+overflow-x: auto;
+padding: 0.8rem 1rem;
+border-radius: 3px;
+background: light-dark(rgb(0 0 0 / 0.045), rgb(255 255 255 / 0.05));
+font-size: var(--step--1);
+line-height: 1.5;
+}
+.sourceCode {
+.kw, .cf, .im { font-weight: 600; }
+.co { color: var(--muted); font-style: italic; }
+.st, .dv, .fl, .bn, .ch, .ss { color: var(--accent); }
+}
+math { font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", math; }
+.math-tail { white-space: nowrap; }
+.display-math {
+display: block;
+overflow-x: auto;
+overflow-y: hidden;
+margin-block: 1.2em;
+padding-block: 0.2em;
+}
+.footnotes {
+margin-top: var(--space-4);
+font-size: var(--step--1);
+color: var(--muted);
+hr { border: 0; border-top: 1px solid var(--line); }
+}
+.footnote-ref {
+text-decoration: none;
+sup { line-height: 0; }
+}
+.gallery {
+--bg: #1d1f1e;
+--text: #e3e6e2;
+--muted: #8d938f;
+--accent: #b3c78a;
+--line: rgb(255 255 255 / 0.14);
+--inset: 1.25rem;
+color-scheme: dark;
+display: grid;
+grid-template: "name stage" auto "nav stage" minmax(0, 1fr) / 16rem minmax(0, 1fr);
+height: 100dvh;
+overflow: hidden;
+color: var(--muted);
+font-size: var(--step--1);
+a { color: inherit; text-decoration: none; }
+a:hover, a[aria-current] { color: var(--text); }
+:focus-visible { outline-color: var(--text); }
+:where(ul) { margin: 0; padding: 0; list-style: none; }
+.site-name {
+grid-area: name;
+padding: 1rem var(--gutter) 1.6rem;
+color: var(--text);
+font-size: var(--step-0);
+}
+.site-nav { display: none; }
+}
+.side { display: contents; }
+.folders {
+grid-area: nav;
+overflow-y: auto;
+padding: 0 1.25rem 1.25rem var(--gutter);
+scrollbar-width: thin;
+> ul > li > a {
+display: block;
+padding: 0.35rem 0;
+&[aria-current] { font-weight: 600; }
+}
+}
+.thumbs {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 3px;
+padding: 0.3rem 0 0.9rem;
+a { display: block; position: relative; }
+img {
+display: block;
+width: 100%;
+aspect-ratio: 1;
+object-fit: cover;
+background-color: rgb(255 255 255 / 0.08);
+opacity: 0.5;
+}
+a:hover img, a[aria-current] img { opacity: 1; }
+a[aria-current]::after {
+content: "";
+position: absolute;
+inset: auto 0 -3px;
+border-top: 2px solid var(--accent);
+}
+}
+.stage {
+grid-area: stage;
+position: relative;
+min-width: 0;
+background: var(--bg);
+}
+.strip {
+display: flex;
+height: 100%;
+overflow: auto hidden;
+overscroll-behavior-x: contain;
+scroll-snap-type: x mandatory;
+scrollbar-width: none;
+&::-webkit-scrollbar { display: none; }
+&:focus-visible { outline-offset: -2px; }
+&.pointer-focus:focus-visible { outline: none; }
+}
+.slide {
+position: relative;
+flex: 0 0 100%;
+min-width: 0;
+margin: 0;
+padding: var(--inset);
+scroll-snap-align: start;
+scroll-snap-stop: always;
+img {
+display: block;
+width: 100%;
+height: 100%;
+object-fit: contain;
+background-size: contain;
+cursor: zoom-in;
+}
+figcaption { display: none; }
+}
+.arrow {
+position: absolute;
+inset-block: 0;
+width: clamp(3rem, 12%, 7rem);
+display: grid;
+place-items: center;
+color: #fff;
+opacity: 0;
+filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.7)) drop-shadow(0 0 6px rgb(0 0 0 / 0.45));
+&::before {
+content: "";
+width: 1.1rem;
+height: 1.1rem;
+border: solid currentColor;
+border-width: 0 0 2px 2px;
+transform: translateX(25%) rotate(45deg);
+}
+&:hover, &:focus-visible { opacity: 1; }
+&:focus-visible { outline-offset: -6px; }
+}
+.prev { left: 0; }
+.next { right: 0; &::before { transform: translateX(-25%) rotate(-135deg); } }
+@media (hover: hover) {
+.stage:hover .arrow { opacity: 0.6; }
+.stage .arrow:hover { opacity: 1; }
+}
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+.arrow { animation: hint 3s both; }
+.hinted .arrow { animation: none; }
+}
+@keyframes pulse { 50% { opacity: 0.75; } }
+@keyframes hint { 0%, 65% { opacity: 0.5; } to { opacity: 0; } }
+.exit {
+display: none;
+position: absolute;
+right: max(0.5rem, env(safe-area-inset-right));
+bottom: max(0.4rem, env(safe-area-inset-bottom));
+width: 2.75rem;
+height: 2.75rem;
+place-items: center;
+padding: 0;
+border: 0;
+background: none;
+color: #fff;
+cursor: pointer;
+}
+.viewing {
+.stage { position: fixed; inset: 0; z-index: 100; background: #000; }
+.strip:focus-visible { outline: none; }
+.slide { --inset: 0px; }
+.slide img { cursor: zoom-out; }
+.arrow { opacity: 0.6; animation: none; }
+.exit { display: grid; }
+.slide figcaption {
+display: block;
+position: absolute;
+inset: auto 0 0;
+padding: 3rem 4rem max(1.2rem, env(safe-area-inset-bottom)) 1.5rem;
+text-align: right;
+color: rgb(255 255 255 / 0.85);
+background: linear-gradient(transparent, rgb(0 0 0 / 0.45));
+pointer-events: none;
+}
+.count { margin-left: 0.6em; color: rgb(255 255 255 / 0.55); font-variant-numeric: tabular-nums; }
+@media (hover: none) {
+.arrow { width: clamp(4.5rem, 25%, 9rem); }
+.strip { touch-action: pan-x; }
+}
+&.idle .stage {
+&, * { cursor: none; }
+:is(.arrow, figcaption, .exit) { opacity: 0; }
+:is(.arrow, .exit):focus-visible { opacity: 1; }
+}
+}
+@media (prefers-reduced-motion: no-preference) {
+.arrow, .exit, .slide figcaption { transition: opacity 0.15s; }
+.slide.loading img { animation: pulse 1.4s ease-in-out 0.3s infinite; }
+::view-transition-group(root) { animation-duration: 0.15s; }
+}
+@media (width < 50rem) and (aspect-ratio <= 8/5), (orientation: portrait) and (width < 64rem) {
+.gallery {
+--inset: 0px;
+grid-template: "name site-nav" auto "stage stage" minmax(0, 1fr) "nav nav" auto / auto minmax(0, 1fr);
+}
+.gallery :is(.site-name, .site-nav) {
+align-self: baseline;
+padding: max(var(--space-2), env(safe-area-inset-top)) var(--gutter) 0.7rem;
+}
+.gallery .site-nav {
+grid-area: site-nav;
+display: flex;
+justify-content: end;
+font-size: var(--step-0);
+}
+.folders {
+--thumb: 3.4rem;
+--film-top: 0.6rem;
+position: relative;
+overflow: visible;
+padding: calc(var(--film-top) + var(--thumb) + 0.4rem) 0 max(0.6rem, env(safe-area-inset-bottom));
+> ul {
+display: flex;
+gap: 0.4rem;
+overflow-x: auto;
+padding-inline: var(--gutter);
+scrollbar-width: none;
+}
+> ul > li > a {
+padding: 0.3rem 0.75rem;
+border: 1px solid var(--line);
+border-radius: 99px;
+white-space: nowrap;
+&[aria-current] { border-color: var(--muted); }
+}
+@media (scripting: enabled) {
+&::after {
+content: "";
+position: absolute;
+top: calc(var(--film-top) - 3px);
+left: calc(50% - var(--thumb) / 2 - 3px);
+width: calc(var(--thumb) + 6px);
+aspect-ratio: 1;
+border: 2px solid var(--accent);
+pointer-events: none;
+}
+}
+}
+.thumbs {
+position: absolute;
+inset: var(--film-top) 0 auto;
+display: flex;
+gap: 4px;
+height: var(--thumb);
+padding: 0 calc(50% - var(--thumb) / 2);
+overflow-x: auto;
+overscroll-behavior-x: contain;
+scroll-snap-type: x mandatory;
+scrollbar-width: none;
+li { flex: 0 0 var(--thumb); scroll-snap-align: center; }
+a[aria-current]::after { display: none; }
+}
+@media (width <= 17.5rem) {
+.gallery .site-nav { display: none; }
+}
+}
+@media (prefers-contrast: more) {
+:root {
+--muted: light-dark(#3b423f, #c5cbc6);
+--line: light-dark(rgb(28 33 31 / 0.6), rgb(227 230 226 / 0.6));
+}
+.gallery { --muted: #c5cbc6; --line: rgb(255 255 255 / 0.5); }
+.thumbs img { opacity: 0.75; }
+}
+@media (forced-colors: active) {
+.home .wordmark { background: Canvas; }
+}
+@media print {
+.site-header, .site-footer, .download, .skip { display: none; }
+body { background: #fff; color: #000; font-size: 10.5pt; }
+a { color: inherit; text-decoration: none; }
+.wrap { width: auto; }
+.cv h2 { margin-top: 1.2rem; }
+.cv a[href^="http"]::after { content: " (" attr(href) ")"; }
+}
+</style>
+</head>
+<body class="">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<div class="site-name"><a class="up" href="index.html" aria-label="Back to Writing"><svg class="back" viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10 10 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>‹</svg></a><a class="wordmark" href="../index.html" aria-label="Yannik Ammann, home"><svg class="ya" viewBox="0 0 171.3 100" aria-hidden="true"><path d="M122.3 -12 67.9 112 M111.8 -12 166.2 112 M75.3 -12 20.9 112 M40.2 68 5.1 -12 M87.2 68 146.9 68" stroke="currentColor" stroke-width="19" fill="none"/>YA</svg><span aria-hidden="true">mmann</span></a></div>
+<nav class="site-nav" aria-label="Sections">
+<a href="../cv.html">CV</a>
+<a href="../photos/index.html">Photos</a>
+<a href="index.html" aria-current="true">Writing</a>
+</nav>
+</header>
+<main id="main">
+<article class="wrap post">
+<header>
+<h1>Julia for joint models</h1>
+<p class="meta">Master&#x27;s thesis, ETH Zürich, with Roche, <time datetime="2023-08">August 2023</time></p>
+<ul class="inline meta"><li><a href="joint-models-thesis.pdf" download>Download PDF</a></li><li><a href="joint-models-thesis-with-appendix.pdf" download>PDF with appendix</a></li><li><a href="jointsurvivalmodels-jl.html">The package that came out of it</a></li></ul>
+<p class="abstract">Joint models let a tumour&#x27;s growth curve inform a patient&#x27;s risk of death. For statisticians: the hazard from its definition, the joint likelihood with a non-linear mixed-effects model, and how a Bayesian fit in Julia was checked against R and Stan.</p>
+</header>
+<div class="prose">
+<p>In an oncology trial every patient produces two kinds of data:
+tumour-size measurements over time, and a time to an event such as
+death. A <em>joint model</em> fits both at once, so that the tumour’s
+trajectory informs the risk. My master’s thesis asked whether such
+models, with a non-linear tumour model, can be built and checked in one
+language, Julia, instead of R wrapped around Stan and C++. I wrote it at
+ETH Zürich’s Seminar for Statistics with Roche in Basel, supervised by
+Prof. Peter Bühlmann, and it was graded 6.0 out of 6.</p>
+<p>This page is the statistical side: the hazard, the joint likelihood,
+and how the fitted model was checked. The software side is in the post
+on <a href="jointsurvivalmodels-jl.html">JointSurvivalModels.jl</a>, the
+package that came out of it.</p>
+<h2 id="the-hazard">The hazard</h2>
+<p>Let
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">T \ge 0</annotation></semantics></math>
+be the time to the event, with distribution function
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>F</mi><annotation encoding="application/x-tex">F</annotation></semantics></math>,</span>
+density
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>f</mi><annotation encoding="application/x-tex">f</annotation></semantics></math>
+and survival function
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mi>P</mi><mo stretchy="false" form="prefix">(</mo><mi>T</mi><mo>&gt;</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">S(t) = P(T &gt; t)</annotation></semantics></math>.</span>
+The hazard is the rate at which the event happens at time
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>,</span>
+given that it has not happened before:</p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><munder><mi mathvariant="normal">lim</mi><mrow><mi>δ</mi><mo>→</mo><msup><mn>0</mn><mo>+</mo></msup></mrow></munder><mfrac><mrow><mi>P</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>≤</mo><mi>T</mi><mo>&lt;</mo><mi>t</mi><mo>+</mo><mi>δ</mi><mo>∣</mo><mi>T</mi><mo>≥</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow><mi>δ</mi></mfrac><mo>=</mo><mfrac><mrow><mi>f</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow><mrow><mi>S</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">h(t) = \lim_{\delta \to 0^+} \frac{P(t \le T &lt; t + \delta \mid T \ge t)}{\delta} = \frac{f(t)}{S(t)}.</annotation></semantics></math></span></p>
+<p>It is a rate, not a probability: it has units of one over time and
+can exceed 1. Among the patients still at risk at time
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>,</span>
+about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mspace width="0.167em"></mspace><mi>δ</mi></mrow><annotation encoding="application/x-tex">h(t)\,\delta</annotation></semantics></math>
+of them have the event in the next short interval
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>δ</mi><annotation encoding="application/x-tex">\delta</annotation></semantics></math>.</span></p>
+<p>Since
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mo>=</mo><mi>−</mi><msup><mi>S</mi><mo>′</mo></msup></mrow><annotation encoding="application/x-tex">f = -S&#39;</annotation></semantics></math>,</span>
+the hazard is
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi><mo>=</mo><mi>−</mi><mstyle displaystyle="false"><mfrac><mi>d</mi><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mstyle><mrow><mi mathvariant="normal">log</mi><mo>&#8289;</mo></mrow><mi>S</mi></mrow><annotation encoding="application/x-tex">h = -\tfrac{d}{dt}\log S</annotation></semantics></math>.</span>
+Integrating gives the cumulative hazard
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math>
+and, from it, everything else:</p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msubsup><mo>∫</mo><mn>0</mn><mi>t</mi></msubsup><mi>h</mi><mo stretchy="false" form="prefix">(</mo><mi>u</mi><mo stretchy="false" form="postfix">)</mo><mspace width="0.167em"></mspace><mi>d</mi><mi>u</mi><mo>,</mo><mspace width="2.0em"></mspace><mi>S</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>H</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow></msup><mo>,</mo><mspace width="2.0em"></mspace><mi>f</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mi>h</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mspace width="0.167em"></mspace><msup><mi>e</mi><mrow><mi>−</mi><mi>H</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow></msup><mi>.</mi></mrow><annotation encoding="application/x-tex">H(t) = \int_0^t h(u)\,du, \qquad S(t) = e^{-H(t)}, \qquad f(t) = h(t)\,e^{-H(t)}.</annotation></semantics></math></span></p>
+<p>So the hazard alone defines the distribution. Any non-negative
+function whose integral diverges is the hazard of exactly one
+distribution on
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mi>∞</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">[0, \infty)</annotation></semantics></math>.</span>
+This is why survival models are written in terms of
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>h</mi><annotation encoding="application/x-tex">h</annotation></semantics></math>:</span>
+it is the quantity that is easy to reason about (“the risk doubles”) and
+easy to modify.</p>
+<p><strong>Censoring.</strong> A study ends, or a patient leaves it,
+before the event. We then observe
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>=</mo><mrow><mi mathvariant="normal">min</mi><mo>&#8289;</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>T</mi><mo>,</mo><mi>c</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">t = \min(T, c)</annotation></semantics></math>
+and an indicator
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>δ</mi><annotation encoding="application/x-tex">\delta</annotation></semantics></math>,</span>
+1 for an event and 0 for a censored time. An event contributes its
+density to the likelihood, a censored time only the fact of survival up
+to
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>:</span></p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>,</mo><mi>δ</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mi>f</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><msup><mo stretchy="false" form="postfix">)</mo><mi>δ</mi></msup><mspace width="0.167em"></mspace><mi>S</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><msup><mo stretchy="false" form="postfix">)</mo><mrow><mn>1</mn><mo>−</mo><mi>δ</mi></mrow></msup><mo>,</mo><mspace width="2.0em"></mspace><mrow><mi mathvariant="normal">log</mi><mo>&#8289;</mo></mrow><mi>L</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>,</mo><mi>δ</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mi>δ</mi><mrow><mi mathvariant="normal">log</mi><mo>&#8289;</mo></mrow><mi>h</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>−</mo><mi>H</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">L(t, \delta) = f(t)^{\delta}\,S(t)^{1-\delta}, \qquad \log L(t, \delta) = \delta \log h(t) - H(t).</annotation></semantics></math></span></p>
+<p><strong>Covariates.</strong> Cox’s proportional-hazards model
+multiplies a baseline hazard by an exponential,
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>∣</mo><mi>x</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msub><mi>h</mi><mn>0</mn></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mrow><mi mathvariant="normal">exp</mi><mo>&#8289;</mo></mrow><mo stretchy="false" form="prefix">(</mo><msup><mi>β</mi><mi>⊤</mi></msup><mi>x</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">h(t \mid x) = h_0(t)\exp(\beta^\top x)</annotation></semantics></math>.</span>
+The ratio of two patients’ hazards is then
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mi mathvariant="normal">exp</mi><mo>&#8289;</mo></mrow><mo stretchy="false" form="prefix">(</mo><msup><mi>β</mi><mi>⊤</mi></msup><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>−</mo><msub><mi>x</mi><mn>2</mn></msub><mo stretchy="false" form="postfix">)</mo><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\exp(\beta^\top (x_1 - x_2))</annotation></semantics></math>,</span>
+free of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
+and of
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>h</mi><mn>0</mn></msub><annotation encoding="application/x-tex">h_0</annotation></semantics></math>,</span>
+which is what makes the coefficients interpretable.</p>
+<h2 id="the-longitudinal-model">The longitudinal model</h2>
+<p>Patient
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
+has measurements
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>y</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><annotation encoding="application/x-tex">y_{ij}</annotation></semantics></math>
+at times
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>t</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><annotation encoding="application/x-tex">t_{ij}</annotation></semantics></math>.</span>
+A mixed-effects model gives every patient the same curve
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>
+with their own parameters
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>ψ</mi><mi>i</mi></msub><annotation encoding="application/x-tex">\psi_i</annotation></semantics></math>,</span>
+drawn around population values:
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>m</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mi>m</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>,</mo><msub><mi>ψ</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">m_i(t) = m(t, \psi_i)</annotation></semantics></math>.</span>
+With an error model on top, each measurement has a density
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>y</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>∣</mo><msub><mi>t</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">p_i(y_{ij} \mid t_{ij})</annotation></semantics></math>.</span></p>
+<p>Nothing here requires
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>
+to be linear, and in oncology it is not. Following Kerioui et
+al. (2020), the sum of the longest tumour diameters grows exponentially
+until treatment starts at
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>t</mi><mi>x</mi></msub><annotation encoding="application/x-tex">t_x</annotation></semantics></math>;</span>
+after that a fraction
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>φ</mi><annotation encoding="application/x-tex">\varphi</annotation></semantics></math>
+of the tumour shrinks at rate
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math>
+while the rest keeps growing at rate
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>:</span></p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mtext mathvariant="normal">SLD</mtext><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>,</mo><mi>ψ</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left" style="text-align: left"><mtext mathvariant="normal">BSLD</mtext><mspace width="0.167em"></mspace><msup><mi>e</mi><mrow><mi>g</mi><mi>t</mi></mrow></msup></mtd><mtd columnalign="left" style="text-align: left"><mi>t</mi><mo>&lt;</mo><msub><mi>t</mi><mi>x</mi></msub></mtd></mtr><mtr><mtd columnalign="left" style="text-align: left"><mtext mathvariant="normal">BSLD</mtext><mspace width="0.167em"></mspace><msup><mi>e</mi><mrow><mi>g</mi><msub><mi>t</mi><mi>x</mi></msub></mrow></msup><mo minsize="120%" maxsize="120%" stretchy="true" form="prefix">(</mo><mi>φ</mi><mspace width="0.167em"></mspace><msup><mi>e</mi><mrow><mi>−</mi><mi>d</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>−</mo><msub><mi>t</mi><mi>x</mi></msub><mo stretchy="false" form="postfix">)</mo></mrow></msup><mo>+</mo><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>−</mo><mi>φ</mi><mo stretchy="false" form="postfix">)</mo><mspace width="0.167em"></mspace><msup><mi>e</mi><mrow><mi>g</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>−</mo><msub><mi>t</mi><mi>x</mi></msub><mo stretchy="false" form="postfix">)</mo></mrow></msup><mo minsize="120%" maxsize="120%" stretchy="true" form="postfix">)</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>t</mi><mo>≥</mo><msub><mi>t</mi><mi>x</mi></msub></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">\text{SLD}(t, \psi) = \begin{cases} \text{BSLD}\, e^{g t} &amp; t &lt; t_x \\ \text{BSLD}\, e^{g t_x}\big(\varphi\, e^{-d (t - t_x)} + (1 - \varphi)\, e^{g (t - t_x)}\big) &amp; t \ge t_x \end{cases}</annotation></semantics></math></span></p>
+<p>with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ψ</mi><mo>=</mo><mo stretchy="false" form="prefix">(</mo><mtext mathvariant="normal">BSLD</mtext><mo>,</mo><mi>g</mi><mo>,</mo><mi>d</mi><mo>,</mo><mi>φ</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\psi = (\text{BSLD}, g, d, \varphi)</annotation></semantics></math>
+per patient: log-normal random effects on the first three, a
+logit-normal one on
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>φ</mi><annotation encoding="application/x-tex">\varphi</annotation></semantics></math>,</span>
+and a multiplicative error
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>y</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><mtext mathvariant="normal">SLD</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>t</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>,</mo><msub><mi>ψ</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>+</mo><msub><mi>e</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">y_{ij} = \text{SLD}(t_{ij}, \psi_i)(1 + e_{ij})</annotation></semantics></math>.</span></p>
+<h2 id="joining-them">Joining them</h2>
+<p>A joint model puts the patient’s curve into their hazard, in the same
+place Cox puts a covariate:</p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>h</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msub><mi>h</mi><mn>0</mn></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mspace width="0.167em"></mspace><mrow><mi mathvariant="normal">exp</mi><mo>&#8289;</mo></mrow><mo minsize="120%" maxsize="120%" stretchy="true" form="prefix">(</mo><mi>β</mi><mo>⋅</mo><mi>g</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>m</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo stretchy="false" form="postfix">)</mo><mo minsize="120%" maxsize="120%" stretchy="true" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">h_i(t) = h_0(t)\,\exp\big(\beta \cdot g(m_i(t))\big).</annotation></semantics></math></span></p>
+<p>The <em>link</em>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>
+says which feature of the curve drives the risk. It acts on the curve,
+not on a number: the current tumour size
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>m</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">m_i(t)</annotation></semantics></math>,</span>
+its growth rate
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mstyle displaystyle="false"><mfrac><mi>d</mi><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mstyle><msub><mi>m</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\tfrac{d}{dt} m_i(t)</annotation></semantics></math>,</span>
+or a summary of the whole trajectory such as the time at which the
+tumour starts to grow again. The coefficient
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math>
+is the quantity of interest: how strongly does the tumour’s course move
+the risk of death?</p>
+<p>Given the parameters
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math>,</span>
+which include every
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>ψ</mi><mi>i</mi></msub><annotation encoding="application/x-tex">\psi_i</annotation></semantics></math>,</span>
+the two kinds of data are independent, and the log-likelihood is a sum
+of a survival part and a longitudinal part:</p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ℓ</mi><mo stretchy="false" form="prefix">(</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><munder><mo>∑</mo><mi>i</mi></munder><mo minsize="120%" maxsize="120%" stretchy="true" form="prefix">[</mo><msub><mi>δ</mi><mi>i</mi></msub><mrow><mi mathvariant="normal">log</mi><mo>&#8289;</mo></mrow><msub><mi>h</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>t</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>−</mo><msub><mi>H</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>t</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo><mo minsize="120%" maxsize="120%" stretchy="true" form="postfix">]</mo><mo>+</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></munder><mrow><mi mathvariant="normal">log</mi><mo>&#8289;</mo></mrow><msub><mi>p</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>y</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>∣</mo><msub><mi>t</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">\ell(\theta) = \sum_i \big[\delta_i \log h_i(t_i) - H_i(t_i)\big] + \sum_{i,j} \log p_i(y_{ij} \mid t_{ij}).</annotation></semantics></math></span></p>
+<p>Compared with feeding the measured tumour sizes into a Cox model as a
+time-varying covariate, this uses a smooth curve at every
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
+instead of noisy values at visit times, and it carries the uncertainty
+about that curve into
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math>.</span></p>
+<p>Two caveats belong here. The longitudinal part treats a patient’s
+measurements as independent given
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>ψ</mi><mi>i</mi></msub><annotation encoding="application/x-tex">\psi_i</annotation></semantics></math>,</span>
+which is a strong assumption for a tumour that either grows or shrinks.
+And the exponential form is a convention inherited from Cox; other ways
+of letting
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>m</mi><mi>i</mi></msub><annotation encoding="application/x-tex">m_i</annotation></semantics></math>
+act on the hazard are possible.</p>
+<h2 id="why-this-needed-new-software">Why this needed new software</h2>
+<p>With the SLD curve inside the exponential,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>H</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msubsup><mo>∫</mo><mn>0</mn><mi>t</mi></msubsup><msub><mi>h</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>u</mi><mo stretchy="false" form="postfix">)</mo><mspace width="0.167em"></mspace><mi>d</mi><mi>u</mi></mrow><annotation encoding="application/x-tex">H_i(t) = \int_0^t h_i(u)\,du</annotation></semantics></math>
+has no closed form. The established R packages (JM, JMbayes) avoid the
+integral by allowing only longitudinal models that are linear in their
+parameters. Roche’s newer package <em>jmpost</em> supports non-linear
+models, but as R wrapped around Stan and C++, and at the time with a
+fixed menu of models.</p>
+<p>In the thesis the integral is computed numerically (adaptive
+Gauss–Kronrod quadrature), and the model is fitted by Bayesian
+inference: priors on
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math>,</span>
+and the NUTS sampler of Turing.jl on the log-likelihood above. The
+decisive step was to stop adding the survival term to the log-likelihood
+by hand and instead hand the sampler a proper probability distribution,
+defined by nothing but its hazard. Two things a statistician needs
+depend on that:</p>
+<ul>
+<li>leave-one-out cross-validation (PSIS-LOO) needs to know which
+observation produced which likelihood term;</li>
+<li>posterior predictive checks need to simulate event times, here by
+inverse transform sampling from
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mo>=</mo><mn>1</mn><mo>−</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>H</mi></mrow></msup></mrow><annotation encoding="application/x-tex">F = 1 - e^{-H}</annotation></semantics></math>.</span></li>
+</ul>
+<p>As a check of the numerics, a log-logistic distribution defined only
+through its hazard reproduces the analytical density, and 10,000
+simulated event times fall on the same curve:</p>
+<figure>
+<img src="joint-models-thesis/loglogistic_diagnostics.svg" width="600" height="400"
+alt="A log-logistic distribution defined only by its hazard: analytical density, numerical density and a histogram of 10,000 samples." />
+<figcaption aria-hidden="true">A log-logistic distribution defined only
+by its hazard: analytical density, numerical density and a histogram of
+10,000 samples.</figcaption>
+</figure>
+<p>How that distribution is built, and what it became, is the subject of
+the <a href="jointsurvivalmodels-jl.html">package post</a>.</p>
+<h2 id="does-it-get-the-right-answer">Does it get the right answer?</h2>
+<p>Kerioui et al. published a simulated data set (100 patients, 655
+tumour measurements) together with their R/Stan code. I fitted the same
+model with the same priors and the same sampler settings (NUTS, 200
+warm-up and 400 posterior draws) in both, and compared the posterior
+means:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>True value</th>
+<th>R/Stan (original)</th>
+<th>Julia/Turing (mine)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Baseline tumour size
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>μ</mi><mtext mathvariant="normal">BSLD</mtext></msub><annotation encoding="application/x-tex">\mu_{\text{BSLD}}</annotation></semantics></math></td>
+<td>60</td>
+<td>62.3</td>
+<td>61.2</td>
+</tr>
+<tr>
+<td>Growth rate
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>μ</mi><mi>g</mi></msub><annotation encoding="application/x-tex">\mu_g</annotation></semantics></math></td>
+<td>0.0015</td>
+<td>0.0018</td>
+<td>0.0018</td>
+</tr>
+<tr>
+<td>Treated fraction
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>μ</mi><mi>φ</mi></msub><annotation encoding="application/x-tex">\mu_\varphi</annotation></semantics></math></td>
+<td>0.2</td>
+<td>0.20</td>
+<td>0.18</td>
+</tr>
+<tr>
+<td>Baseline scale
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math></td>
+<td>1450</td>
+<td>1505</td>
+<td>1512</td>
+</tr>
+<tr>
+<td>Link coefficient
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math></td>
+<td>0.01</td>
+<td>0.0103</td>
+<td>0.0104</td>
+</tr>
+</tbody>
+</table>
+<p>The two implementations agree with each other and with the truth.
+Where both miss, on one random-effect variance, both also flag it with a
+high
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mover><mi>R</mi><mo accent="true">^</mo></mover><annotation encoding="application/x-tex">\hat R</annotation></semantics></math>.</span>
+The chains are short, so this shows agreement between two
+implementations, not a converged analysis.</p>
+<h2 id="checking-a-fitted-model">Checking a fitted model</h2>
+<p>A model you cannot check is not finished. The thesis builds the
+checks into the same workflow:</p>
+<ul>
+<li><strong>Posterior predictive checks for the trajectories:</strong>
+per patient, the 95% band of simulated measurements against the observed
+ones.</li>
+<li><strong>Posterior predictive checks for survival:</strong> simulated
+event times are hard to compare one by one, so each simulated data set
+is reduced to its Kaplan–Meier curve, and the observed Kaplan–Meier
+curve should lie inside the band of the simulated ones.</li>
+<li><strong>Residuals:</strong> the Cox–Snell residual of patient
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
+is
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msub><mi>H</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>t</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">r_i = H_i(t_i)</annotation></semantics></math>.</span>
+If the model is right, the pairs
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>r</mi><mi>i</mi></msub><mo>,</mo><msub><mi>δ</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(r_i, \delta_i)</annotation></semantics></math>
+look like a censored sample from a unit exponential. The martingale
+residual
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>δ</mi><mi>i</mi></msub><mo>−</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">\delta_i - r_i</annotation></semantics></math>
+is observed minus expected events and shows which patients, or which
+covariate values, the model fits badly.</li>
+</ul>
+<figure>
+<img src="joint-models-thesis/survival_ppc.svg" width="600" height="400"
+alt="Posterior predictive check for a survival model: the observed Kaplan–Meier curve inside the 95% band of curves from simulated data." />
+<figcaption aria-hidden="true">Posterior predictive check for a survival
+model: the observed Kaplan–Meier curve inside the 95% band of curves
+from simulated data.</figcaption>
+</figure>
+<h2 id="predicting-for-one-patient">Predicting for one patient</h2>
+<p>The plot that uses everything at once is the prediction for a single
+patient. Patient 25 was still alive at their last visit, around day 700
+(the vertical line), so their survival time is censored there. The
+question is what the fitted model says about this patient from that day
+on.</p>
+<figure>
+<img src="joint-models-thesis/individual_prediction.svg" width="600" height="400"
+alt="Posterior prediction for one patient: tumour size (SLD) over time with the observed measurements, and survival conditional on being alive at the last visit. Lines are posterior medians, bands 95% intervals." />
+<figcaption aria-hidden="true">Posterior prediction for one patient:
+tumour size (SLD) over time with the observed measurements, and survival
+conditional on being alive at the last visit. Lines are posterior
+medians, bands 95% intervals.</figcaption>
+</figure>
+<p>Both bands come from the same posterior draws
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>θ</mi><mrow><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow></msup><mo>,</mo><mi>…</mi><mo>,</mo><msup><mi>θ</mi><mrow><mo stretchy="false" form="prefix">(</mo><mi>S</mi><mo stretchy="false" form="postfix">)</mo></mrow></msup></mrow><annotation encoding="application/x-tex">\theta^{(1)}, \dots, \theta^{(S)}</annotation></semantics></math>.</span>
+Each draw contains this patient’s own curve parameters
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>ψ</mi><mi>i</mi><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">\psi_i^{(s)}</annotation></semantics></math>,</span>
+and their posterior has already learned from both kinds of data: the
+measurements, and the fact that the patient survived to the last
+visit.</p>
+<p><strong>The tumour band (blue)</strong> is a posterior predictive
+interval. For every draw and every time
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
+on a grid, a new measurement is simulated from the error model around
+that draw’s curve,</p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mover><mi>y</mi><mo accent="true">~</mo></mover><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo stretchy="false" form="postfix">)</mo></mrow></msup><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>∼</mo><mi>p</mi><mo minsize="120%" maxsize="120%" stretchy="true" form="prefix">(</mo><mi>y</mi><mo>∣</mo><mi>m</mi><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>,</mo><msubsup><mi>ψ</mi><mi>i</mi><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><mo stretchy="false" form="postfix">)</mo><mo>,</mo><msup><mi>σ</mi><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo stretchy="false" form="postfix">)</mo></mrow></msup><mo minsize="120%" maxsize="120%" stretchy="true" form="postfix">)</mo><mo>,</mo></mrow><annotation encoding="application/x-tex">\tilde y^{(s)}(t) \sim p\big(y \mid m(t, \psi_i^{(s)}), \sigma^{(s)}\big),</annotation></semantics></math></span></p>
+<p>and the band is the 2.5% to 97.5% range of these simulations at each
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>.</span>
+It therefore answers “where would a measurement fall?”, and it contains
+both the uncertainty about the curve and the measurement error. That is
+why the observed points should lie inside it, and mostly do. Right of
+the vertical line there are no measurements; the band widens because the
+draws disagree about how fast the tumour regrows.</p>
+<p><strong>The survival band (green)</strong> is a different kind of
+object. The quantity is the patient’s survival curve from the last visit
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msup><mi>t</mi><mo>*</mo></msup><annotation encoding="application/x-tex">t^*</annotation></semantics></math>
+on, given that they were alive then:</p>
+<p><span class="display-math"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>S</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>∣</mo><mi>T</mi><mo>&gt;</mo><msup><mi>t</mi><mo>*</mo></msup><mo>,</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mfrac><mrow><msub><mi>S</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo>∣</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo></mrow><mrow><msub><mi>S</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msup><mi>t</mi><mo>*</mo></msup><mo>∣</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo></mrow></mfrac><mo>=</mo><mrow><mi mathvariant="normal">exp</mi><mo>&#8289;</mo></mrow><mo minsize="120%" maxsize="120%" stretchy="true" form="prefix">(</mo><mo>−</mo><mo stretchy="false" form="prefix">(</mo><msub><mi>H</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo>−</mo><msub><mi>H</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msup><mi>t</mi><mo>*</mo></msup><mo stretchy="false" form="postfix">)</mo><mo stretchy="false" form="postfix">)</mo><mo minsize="120%" maxsize="120%" stretchy="true" form="postfix">)</mo><mo>,</mo><mspace width="2.0em"></mspace><mi>t</mi><mo>≥</mo><msup><mi>t</mi><mo>*</mo></msup><mi>.</mi></mrow><annotation encoding="application/x-tex">S_i(t \mid T &gt; t^*, \theta) = \frac{S_i(t \mid \theta)}{S_i(t^* \mid \theta)} = \exp\big(-(H_i(t) - H_i(t^*))\big), \qquad t \ge t^*.</annotation></semantics></math></span></p>
+<p>For a fixed
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math>
+this is one curve. It is estimated by simulation: for each posterior
+draw, 100 event times are drawn from the patient’s joint distribution,
+those before
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msup><mi>t</mi><mo>*</mo></msup><annotation encoding="application/x-tex">t^*</annotation></semantics></math>
+are discarded (which is the conditioning), and the Kaplan–Meier
+estimator of the rest is that draw’s curve. With no censoring in
+simulated data, Kaplan–Meier is just the empirical survival function.
+The line is the median of these curves at each
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>,</span>
+and the band their 2.5% to 97.5% range.</p>
+<p>So the green band is not an interval for when the patient dies. It is
+a credible band for a probability: “the chance of being alive at day
+1500, given alive at day 700, is around 45%, and the data leave it
+between roughly 25% and 65%”. Its width has two sources: the posterior
+uncertainty about
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math>,</span>
+and the Monte Carlo noise of estimating each curve from at most 100
+simulated times.</p>
+<p>The two halves are linked, which is the point of a joint model. The
+hazard is
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>h</mi><mn>0</mn></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mrow><mi mathvariant="normal">exp</mi><mo>&#8289;</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>β</mi><mspace width="0.167em"></mspace><msub><mi>m</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><mi>t</mi><mo stretchy="false" form="postfix">)</mo><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">h_0(t)\exp(\beta\, m_i(t))</annotation></semantics></math>
+with
+<span class="math-tail"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>β</mi><mo>&gt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\beta &gt; 0</annotation></semantics></math>,</span>
+so a draw in which the tumour regrows quickly is also a draw in which
+survival falls quickly.</p>
+<p>The detour through simulation, instead of evaluating
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>H</mi><mi>i</mi></msub><annotation encoding="application/x-tex">H_i</annotation></semantics></math>
+directly, is deliberate: the plot uses nothing but simulated data, so it
+works unchanged for any baseline hazard, link or tumour model.</p>
+<p>The residuals above need each patient’s cumulative hazard from every
+posterior draw. To record it during sampling I first wrote a small
+helper distribution that always returns one value. Then I noticed that
+this is the Dirac distribution, which Distributions.jl already has, and
+used that.</p>
+<h2 id="what-i-concluded">What I concluded</h2>
+<p>Julia is well suited to this work. The model code stays close to the
+formulas above, and one language covers the model, the sampler and the
+diagnostics. Compared with jmpost, which tells the user clearly which
+models exist and how to load data, my workflow asks for more code and
+gives more freedom: any longitudinal model, any baseline hazard, any
+link. The caveat is age. The ecosystem is younger than R’s or SAS’s, and
+I hit rough edges along the way.</p>
+<p>What I handed over at Roche was a documentation site of workflows for
+survival, longitudinal and joint models, included in the thesis
+appendix. The hazard-defined distribution outlived the thesis as an
+open-source package: <a
+href="jointsurvivalmodels-jl.html">JointSurvivalModels.jl</a>.</p>
+
+</div>
+</article>
+</main>
+<footer class="site-footer">
+<p>© 2026 Yannik Ammann</p>
+<ul class="inline">
+<li><a href="https://www.linkedin.com/in/yannik-ammann-81309b6a/" rel="me">LinkedIn</a></li>
+<li><a href="https://github.com/ya0" rel="me">GitHub</a></li>
+<li><a href="mailto:contact@yammann.ch">Get in touch</a></li>
+</ul>
+</footer>
+</body>
+</html>
